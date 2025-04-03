@@ -55,17 +55,17 @@ export const createOrder = async (req, res) => {
                                     quantity: "1",
                                     unit_amount: {
                                         currency_code: "USD",
-                                        value: "50.00"
+                                        value: "5.00"
                                     }
                                 }
                             ],
                             amount: {
                                 currency_code: "USD",
-                                value: "50.00",
+                                value: "5.00",
                                 breakdown: {
                                     item_total: {
                                         currency_code: "USD",
-                                        value: "50.00"
+                                        value: "5.00"
                                     }
                                 }
                             }
@@ -78,10 +78,10 @@ export const createOrder = async (req, res) => {
                                 payment_method_selected: "PAYPAL",
                                 brand_name: "DekayHub - Volatility Grid",
                                 shipping_preference: "NO_SHIPPING",
-                                locale: "en-US",
+                                locale: "de-DE",
                                 user_action: "PAY_NOW",
-                                return_url: `${process.env.PAYPAL_REDIRECT_BASE_URL}/complete-payment`,
-                                cancel_url: `${process.env.PAYPAL_REDIRECT_BASE_URL}/cancel-payment`,
+                                return_url: `${process.env.PAYPAL_REDIRECT_BASE_URL}/complete`,
+                                cancel_url: `${process.env.PAYPAL_REDIRECT_BASE_URL}/cancel`,
                             },
                         },
                     },
@@ -96,9 +96,53 @@ export const createOrder = async (req, res) => {
         }
 
         const data = await response.json();
-        res.status(200).json(data);
+        const orderId = data.id;
+        console.log({data, orderId});
+        
+        res.status(200).json({orderId});
     } catch (error) {
         console.log(error);
         res.status(500).json({msg: "Server error!"});
+    }
+};
+
+export const capturePayment = async (req, res) => {
+    try {
+        const accessToken = await getAccessToken();
+
+        const { paymentId } = req.params;
+
+        const response = await fetch(
+            `${process.env.PAYPAL_BASE_URL}/v2/checkout/orders/${paymentId}/capture`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`Failed to capture payment: ${response.statusText}`);
+        }
+
+        const paymentData = await response.json();
+
+        console.log(paymentData);
+
+        if (paymentData.status !== "COMPLETED") {
+            return res.status(400).json({msg: "Paypal payment incomplete or failed!"})
+        };
+
+        const email = "test@xyz.com";
+        const daysToExtend = 30;
+        const currentDate = new Date();
+        const tierEndAt = new Date(currentDate.setDate(currentDate.getDate() + daysToExtend));
+
+        res.status(200).json({message: "success", user: {email, tier: "pro", tierEndAt}});
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ msg: "Server error" });
     }
 };
